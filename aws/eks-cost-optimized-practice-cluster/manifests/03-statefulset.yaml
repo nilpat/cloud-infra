@@ -1,0 +1,60 @@
+# Practice: encrypted gp3 StorageClass (EBS CSI) + headless Service + StatefulSet.
+# Each pod gets a stable DNS name (store-0.store-headless.demo.svc.cluster.local)
+# and its own 1 GiB EBS volume. Costs a few cents; deleted with the namespace.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3-encrypted
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer # create the volume in the pod's AZ
+reclaimPolicy: Delete # delete the EBS volume when the PVC is deleted
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  encrypted: "true" # uses aws/ebs unless you set kmsKeyId
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-headless
+  namespace: demo
+spec:
+  clusterIP: None # headless: DNS returns individual pod IPs
+  selector: { app: store }
+  ports: [{ name: http, port: 80 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: store
+  namespace: demo
+spec:
+  serviceName: store-headless
+  replicas: 2
+  selector:
+    matchLabels: { app: store }
+  template:
+    metadata:
+      labels: { app: store }
+    spec:
+      containers:
+        - name: store
+          image: public.ecr.aws/docker/library/busybox:stable
+          command: ["sh", "-c"]
+          args:
+            - echo "$(hostname) started at $(date)" >> /data/log.txt;
+              httpd -f -p 80 -h /data
+          ports: [{ name: http, containerPort: 80 }]
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 32Mi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3-encrypted
+        resources:
+          requests: { storage: 1Gi }
