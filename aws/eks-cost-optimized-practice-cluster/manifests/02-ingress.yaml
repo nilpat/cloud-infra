@@ -1,0 +1,42 @@
+# Two Ingress objects that SHARE ONE ALB via the same group.name.
+# Without group.name, each Ingress would create its own ALB (~$18-25/month each).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: echo
+  namespace: demo
+  annotations:
+    alb.ingress.kubernetes.io/group.name: practice
+    alb.ingress.kubernetes.io/group.order: "10" # more specific path first
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip # route straight to pod IPs
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /echo
+            pathType: Prefix
+            backend:
+              service: { name: echo, port: { number: 80 } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  namespace: demo
+  annotations:
+    alb.ingress.kubernetes.io/group.name: practice
+    alb.ingress.kubernetes.io/group.order: "20"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web, port: { number: 80 } }
