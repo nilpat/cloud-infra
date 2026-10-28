@@ -1,0 +1,18 @@
+# Generated at runtime by the scripts - holds VPC/ALB/task IDs for this run
+state.env
+state.env.tmp
+
+# Secrets / credentials
+*.pem
+*.key
+*.tfvars
+!*.tfvars.example
+.env
+.env.*
+credentials
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
